@@ -463,18 +463,22 @@ export async function runYokomitsuFullCatalog(
       if (isValidYokomitsuProduct(product)) {
         checkpoint.counters.validProducts += 1;
         await options.outputProduct?.(product);
+      console.log(`production-yokomitsu product-output-done key=${entry.key}`);
       } else {
         checkpoint.counters.errors += 1;
       }
       processedKeys.add(entry.key);
       checkpoint.processedProductKeys = Array.from(processedKeys);
       await saveCheckpoint();
+    console.log(`production-yokomitsu product-checkpoint-done key=${entry.key}`);
       reportProgress(totalPages, startedAt, discoveredKeys.size, sessionRenewed, options.onProgress, checkpoint);
     } catch {
       checkpoint.counters.errors += 1;
       await saveCheckpoint();
     }
   });
+
+  console.log('production-yokomitsu runpool-completed');
 
   if (checkpoint.failedCategories.length > 0) {
     limitations.push(`${checkpoint.failedCategories.length} categories failed and require retry`);
@@ -891,6 +895,8 @@ function secretPattern(): RegExp {
 function delay(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
+
+
 
 
 
