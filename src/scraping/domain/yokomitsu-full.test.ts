@@ -442,7 +442,7 @@ test('Yokomitsu merge final conserva SKU marca y compatibilidad del listing si e
   assert.equal(finalProduct.productName, "PARAGOLPE DELANTERO HATCHBACK RIO '2012-2014'");
   assert.equal(finalProduct.sku, '3136502934');
   assert.equal(finalProduct.brand, 'KIA');
-  assert.deepEqual(finalProduct.compatibleBrands, ['Kia']);
+  assert.deepEqual(finalProduct.compatibleBrands, ['KIA']);
   assert.deepEqual(finalProduct.compatibleModels, ['RIO']);
   assert.equal(finalProduct.imageUrl, 'https://www.yokomitsuparts.com.uy/v2/upload/productsGalleries/img/CRKI112012.jpg');
 });
@@ -464,6 +464,39 @@ test('Yokomitsu merge final no persiste Ver detalle y usa el slug si no hay titu
   assert.equal(finalProduct.imageUrl, undefined);
   assert.equal(finalProduct.imageUrls, undefined);
   assert.equal(finalProduct.attributes?.referencia, '56820-1Y500');
+});
+
+test('Yokomitsu merge final usa compatibilidad limpia del detalle y descarta listing contaminado', () => {
+  const sourceUrl = 'https://www.yokomitsuparts.com.uy/v2/producto-detalle/2008/222/paragolpe-delantero-s-sensor-2008-2021-';
+  const listing = yokomitsuListing({
+    productName: 'ver detalle',
+    sourceUrl,
+    brand: "PEUGEOT PARAGOLPE DELANTERO S/SENSOR 2008 '2021-",
+    compatibleBrands: ["PEUGEOT PARAGOLPE DELANTERO S/SENSOR 2008 '2021-"],
+    compatibleModels: ["PARAGOLPE DELANTERO S/SENSOR 2008 '2021-"],
+    attributes: {
+      vehicleBrand: "PEUGEOT PARAGOLPE DELANTERO S/SENSOR 2008 '2021-",
+      vehicleModel: "PARAGOLPE DELANTERO S/SENSOR 2008 '2021-",
+    },
+  });
+  const detail = extractYokomitsuProductDetailFromHtml(`
+    <article class="producto-detalle" data-codprod="YK-PEUGEOT">
+      <h1>PARAGOLPE DELANTERO S/SENSOR 2008 '2021-</h1>
+      <span>Cód. Yokomitsu: YK-PEUGEOT</span>
+      <span>Marca: PEUGEOT PARAGOLPE DELANTERO S/SENSOR 2008 '2021-</span>
+      <span>Modelo: 2008</span>
+      <strong class="precio">$1.700 +IVA</strong>
+    </article>
+  `, sourceUrl);
+  assert.ok(detail);
+
+  const finalProduct = mergeYokomitsuProduct(listing, detail);
+
+  assert.equal(finalProduct.productName, 'PARAGOLPE DELANTERO S/SENSOR 2008 2021-');
+  assert.equal(finalProduct.brand, 'PEUGEOT');
+  assert.deepEqual(finalProduct.compatibleBrands, ['PEUGEOT']);
+  assert.deepEqual(finalProduct.compatibleModels, ['2008']);
+  assert.equal(finalProduct.compatibleModels?.some((model) => /PARAGOLPE/i.test(model)), false);
 });
 
 interface FakeFullOptions {

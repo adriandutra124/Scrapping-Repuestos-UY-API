@@ -13,6 +13,8 @@ import {
   deriveYokomitsuProductNameFromSourceUrl,
   parseYokomitsuSearchResponseFull,
   sanitizeYokomitsuProductName,
+  sanitizeYokomitsuVehicleBrand,
+  sanitizeYokomitsuVehicleModel,
   YOKOMITSU_BASE_URL,
   YOKOMITSU_LOGIN_URL,
   YOKOMITSU_SEARCH_ENDPOINT,
@@ -771,14 +773,37 @@ export function mergeYokomitsuProduct(listing: ProductRecord, detail?: ProductRe
     };
   }
   const detailProductName = sanitizeYokomitsuProductName(detail.productName);
-  const compatibleBrands = uniqueStrings([...(listing.compatibleBrands ?? []), ...(detail.compatibleBrands ?? [])]);
-  const compatibleModels = uniqueStrings([...(listing.compatibleModels ?? []), ...(detail.compatibleModels ?? [])]);
+  const detailCompatibleBrands = uniqueStrings([
+    ...(detail.compatibleBrands ?? []).map(sanitizeYokomitsuVehicleBrand),
+    sanitizeYokomitsuVehicleBrand(detail.attributes?.vehicleBrand),
+    sanitizeYokomitsuVehicleBrand(detail.brand),
+  ]);
+  const detailCompatibleModels = uniqueStrings([
+    ...(detail.compatibleModels ?? []).map(sanitizeYokomitsuVehicleModel),
+    sanitizeYokomitsuVehicleModel(detail.attributes?.vehicleModel),
+  ]);
+  const listingCompatibleBrands = uniqueStrings([
+    ...(listing.compatibleBrands ?? []).map(sanitizeYokomitsuVehicleBrand),
+    sanitizeYokomitsuVehicleBrand(listing.attributes?.vehicleBrand),
+    sanitizeYokomitsuVehicleBrand(listing.brand),
+  ]);
+  const listingCompatibleModels = uniqueStrings([
+    ...(listing.compatibleModels ?? []).map(sanitizeYokomitsuVehicleModel),
+    sanitizeYokomitsuVehicleModel(listing.attributes?.vehicleModel),
+  ]);
+  const hasDetailCompatibility = Boolean(detailCompatibleBrands?.length || detailCompatibleModels?.length);
+  const compatibleBrands = hasDetailCompatibility ? detailCompatibleBrands : listingCompatibleBrands;
+  const compatibleModels = hasDetailCompatibility ? detailCompatibleModels : listingCompatibleModels;
+  const brand = sanitizeYokomitsuVehicleBrand(detail.brand)
+    ?? sanitizeYokomitsuVehicleBrand(detail.attributes?.vehicleBrand)
+    ?? sanitizeYokomitsuVehicleBrand(listing.brand)
+    ?? sanitizeYokomitsuVehicleBrand(listing.attributes?.vehicleBrand);
   return {
     ...listing,
     ...detail,
     productName: detailProductName ?? listingProductName ?? fallbackProductName,
     sku: detail.sku ?? listing.sku,
-    brand: detail.brand ?? listing.brand,
+    brand,
     compatibleBrands,
     compatibleModels,
     attributes: {

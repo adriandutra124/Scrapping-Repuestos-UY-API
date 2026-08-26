@@ -658,6 +658,56 @@ test('Yokomitsu mantiene campos con dos puntos y publica compatibilidad vehicula
   assert.deepEqual(products[0].compatibleModels, ['RIO']);
 });
 
+test('Yokomitsu limpia vehicleBrand contaminado con titulo largo de repuesto', () => {
+  const cases = [
+    ['PEUGEOT PARAGOLPE DELANTERO S/SENSOR 2008 2021-', '2008', 'PEUGEOT'],
+    ['CHEVROLET LLAVE BAJO VOLANTE SEÑALERO Y LUCES CORSA', 'CORSA', 'CHEVROLET'],
+    ['NISSAN CABLES PALANCA CAMBIO TIIDA 1.6', 'TIIDA 1.6', 'NISSAN'],
+    ['TOYOTA CINTA AIRBAG HILUX REVO', 'HILUX REVO', 'TOYOTA'],
+    ['HYUNDAI CINTA AIRBAG ACCENT', 'ACCENT', 'HYUNDAI'],
+    ['SUZUKI ESPEJO CELERIO', 'CELERIO', 'SUZUKI'],
+  ] as const;
+
+  for (const [brandText, model, expectedBrand] of cases) {
+    const product = extractYokomitsuProductDetailFromHtml(`
+      <article class="producto-detalle" data-codprod="YK-${expectedBrand}">
+        <h1>PIEZA REAL ${model}</h1>
+        <span>Cód. Yokomitsu: YK-${expectedBrand}</span>
+        <span>Marca: ${brandText}</span>
+        <span>Modelo: ${model}</span>
+        <strong class="precio">$1.234 +IVA</strong>
+      </article>
+    `, `https://www.yokomitsuparts.com.uy/v2/producto-detalle/${model.toLowerCase().replace(/\s+/g, '-')}/1/pieza-real`);
+
+    assert.ok(product);
+    assert.equal(product.brand, expectedBrand);
+    assert.equal(product.attributes?.vehicleBrand, expectedBrand);
+    assert.equal(product.attributes?.vehicleModel, model);
+    assert.deepEqual(product.compatibleBrands, [expectedBrand]);
+    assert.deepEqual(product.compatibleModels, [model]);
+  }
+});
+
+test('Yokomitsu descarta #N/A y deriva nombre desde slug si la ficha viene contaminada', () => {
+  const product = extractYokomitsuProductDetailFromHtml(`
+    <article class="producto-detalle" data-codprod="YK-NA">
+      <h1>#N/A (Did not find value '6115522201' in VLOOKUP evaluation.)</h1>
+      <span>Cód. Yokomitsu: YK-NA</span>
+      <span>Marca: #N/A ESPEJO EXTERIOR DERECHO</span>
+      <span>Modelo: #N/A</span>
+      <strong class="precio">$1.700 +IVA</strong>
+    </article>
+  `, 'https://www.yokomitsuparts.com.uy/v2/producto-detalle/celerio/123/espejo-exterior-derecho-celerio-2016-');
+
+  assert.ok(product);
+  assert.equal(product.productName, 'ESPEJO EXTERIOR DERECHO CELERIO 2016-');
+  assert.equal(product.brand, undefined);
+  assert.equal(product.attributes?.vehicleBrand, undefined);
+  assert.equal(product.attributes?.vehicleModel, undefined);
+  assert.equal(product.compatibleBrands?.length ?? 0, 0);
+  assert.equal(product.compatibleModels?.length ?? 0, 0);
+});
+
 test('Yokomitsu no usa textos de accion como productName desde registros JSON', () => {
   const products = extractYokomitsuProductsFromJson({
     items: [{
