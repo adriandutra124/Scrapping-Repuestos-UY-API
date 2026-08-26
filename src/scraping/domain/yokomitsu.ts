@@ -53,6 +53,37 @@ const PRODUCT_IMAGE_PATH_PATTERN = /(?:producto|productos|product|products|yokom
 const PRODUCT_IMAGE_DYNAMIC_PATH_PATTERN = /(?:image|imagen|img|foto|photo|picture|thumb|thumbnail)/i;
 const YOKOMITSU_DETAIL_GALLERY_PATH_PATTERN = /\/(?:v2\/)?upload\/productsgalleries\//i;
 const INVALID_CATEGORY_PATTERN = /^(?:#N\/A|#VALUE!|#REF!|#DIV\/0!|#ERROR!)(?:\b|\s|\(|$)/i;
+const INVALID_YOKOMITSU_VALUE_PATTERN = /^(?:#N\/A|#VALUE!|#REF!|#DIV\/0!|#ERROR!)(?:\b|\s|\(|$)|did not find value .* in vlookup evaluation/i;
+const YOKOMITSU_PART_DESCRIPTION_PATTERN = /\b(?:amortiguador|bastidor|bomba|capot|careta|cerradura|cremallera|defensa|deposito|dep[o\u00f3]sito|espejo|espolon|espol[o\u00f3]n|faro|frente|guardabarro|llave|manija|optico|[o\u00f3]ptico|palanca|paragolpe|puntero|radiador|rejilla|se[ñn]alero|soporte|tapa|terminal|travesa[ñn]o|zocalo|z[o\u00f3]calo)\b/i;
+const YOKOMITSU_KNOWN_VEHICLE_BRANDS = [
+  'ALFA ROMEO',
+  'CHEVROLET',
+  'CITROEN',
+  'DAIHATSU',
+  'DONGFENG',
+  'FIAT',
+  'FORD',
+  'GREAT WALL',
+  'HONDA',
+  'HYUNDAI',
+  'ISUZU',
+  'JAC',
+  'JETOUR',
+  'KIA',
+  'LAND ROVER',
+  'MAZDA',
+  'MERCEDES BENZ',
+  'MITSUBISHI',
+  'NISSAN',
+  'PEUGEOT',
+  'RENAULT',
+  'SSANGYONG',
+  'SUBARU',
+  'SUZUKI',
+  'TOYOTA',
+  'VOLKSWAGEN',
+  'VW',
+].sort((left, right) => right.length - left.length);
 
 type JsonRecord = Record<string, unknown>;
 
@@ -520,6 +551,7 @@ export function extractYokomitsuProductDetailFromHtml(html: string, sourceUrl: s
   if (!product) return undefined;
   return {
     ...product,
+    productName: product.productName ?? deriveYokomitsuProductNameFromSourceUrl(sourceUrl),
     sourceUrl,
     imageUrls: product.imageUrls && product.imageUrls.length > 0 ? product.imageUrls : product.imageUrl ? [product.imageUrl] : undefined,
   };
@@ -578,14 +610,22 @@ function normalizeYokomitsuHtmlProduct(card: HTMLElement, baseUrl: string, optio
     ?? deriveYokomitsuProductNameFromSourceUrl(sourceUrl);
   const sku = cleanText(card.getAttribute('data-codprod'))
     ?? labeledValue(card, ['Cod. Yokomitsu', 'C\u00f3d. Yokomitsu', 'Codigo Yokomitsu', 'C\u00f3digo Yokomitsu', 'SKU', 'Codigo', 'C\u00f3digo']);
-  const rawPrice = firstElementText(card, ['.price', '.precio', '[class*="price"]', '[class*="precio"]'])
+  const offerPriceHeading = card.querySelector('#prices-product .precio-oferta h2');
+  const offerPriceHtml = offerPriceHeading?.innerHTML
+    ?.replace(/<span\b[^>]*>.*?<\/span>/gis, ' ')
+    .replace(/<[^>]+>/g, ' ');
+  const offerCurrentPrice = cleanText(offerPriceHtml)
+    ?.match(/(?:US\$|\$U|\$|UYU|USD)\s*\d[\d.,]*/i)?.[0];
+
+  const rawPrice = offerCurrentPrice
+    ?? firstElementText(card, ['#prices-product h3', '#prices-product > h2', '#prices-product h2', '.price', '.precio', '[class*="price"]', '[class*="precio"]'])
     ?? text.match(/(?:US\$|\$U|\$|UYU|USD)\s*\d[\d.,]*(?:\s*\+?\s*IVA)?/i)?.[0];
   const imageUrls = extractYokomitsuProductImageUrls(card, baseUrl, Boolean(options.detail), options.documentRoot);
   const referencia = labeledValue(card, ['OEM', 'Referencia', 'Ref']);
-  const visibleBrand = labeledValue(card, ['Marca']);
-  const vehicleBrand = labeledValue(card, ['Marca Vehiculo', 'Marca Veh\u00edculo', 'Vehiculo Marca', 'Veh\u00edculo Marca'])
+  const visibleBrand = sanitizeYokomitsuVehicleBrand(labeledValue(card, ['Marca']));
+  const vehicleBrand = sanitizeYokomitsuVehicleBrand(labeledValue(card, ['Marca Vehiculo', 'Marca Veh\u00edculo', 'Vehiculo Marca', 'Veh\u00edculo Marca']))
     ?? visibleBrand;
-  const vehicleModel = labeledValue(card, ['Modelo', 'Modelo Vehiculo', 'Modelo Veh\u00edculo']);
+  const vehicleModel = sanitizeYokomitsuVehicleModel(labeledValue(card, ['Modelo', 'Modelo Vehiculo', 'Modelo Veh\u00edculo']));
   const proximaLlegada = labeledValue(card, ['Proxima llegada', 'Pr\u00f3xima llegada']);
   const procedencia = labeledValue(card, ['Procedencia']);
   const availability = inferVisibleAvailability(text);
@@ -750,8 +790,47 @@ export function sanitizeYokomitsuProductName(value: string | undefined): string 
     .replace(/\s+/g, ' ')
     .trim();
   if (!text) return undefined;
+  if (INVALID_YOKOMITSU_VALUE_PATTERN.test(text)) return undefined;
   if (!isLikelyYokomitsuProductNameCandidate(text)) return undefined;
   return text;
+}
+
+export function sanitizeYokomitsuVehicleBrand(value: string | undefined): string | undefined {
+  const cleaned = cleanText(value)
+    ?.replace(/\bmarca\b\s*:?\s*/i, '')
+    .trim();
+  if (!cleaned || INVALID_YOKOMITSU_VALUE_PATTERN.test(cleaned)) return undefined;
+
+  const known = extractKnownYokomitsuVehicleBrand(cleaned);
+  if (known) return known;
+
+  if (YOKOMITSU_PART_DESCRIPTION_PATTERN.test(cleaned)) return undefined;
+  if (/\bmodelo\b/i.test(cleaned)) return undefined;
+  if (cleaned.length > 40 || cleaned.split(/\s+/).length > 4) return undefined;
+  return cleaned;
+}
+
+export function sanitizeYokomitsuVehicleModel(value: string | undefined): string | undefined {
+  const cleaned = cleanText(value)
+    ?.replace(/\bmodelo\b\s*:?\s*/i, '')
+    .trim();
+  if (!cleaned || INVALID_YOKOMITSU_VALUE_PATTERN.test(cleaned)) return undefined;
+  if (/^(?:no\s+tiene|n\/a|sin\s+datos)$/i.test(cleaned)) return undefined;
+  if (YOKOMITSU_PART_DESCRIPTION_PATTERN.test(cleaned)) return undefined;
+  if (extractKnownYokomitsuVehicleBrand(cleaned) === cleaned.toUpperCase()) return undefined;
+  if (cleaned.length > 45 || cleaned.split(/\s+/).length > 4) return undefined;
+  return cleaned;
+}
+
+function extractKnownYokomitsuVehicleBrand(value: string): string | undefined {
+  const normalized = normalizeComparableText(value);
+  for (const brand of YOKOMITSU_KNOWN_VEHICLE_BRANDS) {
+    const normalizedBrand = normalizeComparableText(brand);
+    if (normalized === normalizedBrand || normalized.startsWith(`${normalizedBrand} `)) {
+      return brand === 'VW' ? 'VOLKSWAGEN' : brand;
+    }
+  }
+  return undefined;
 }
 
 export function deriveYokomitsuProductNameFromSourceUrl(value: string | undefined): string | undefined {
@@ -778,6 +857,7 @@ function isLikelyYokomitsuProductNameCandidate(value: string): boolean {
   if (/^(?:inicio|home|catalogo|categor[ií]as?|productos?|ver\s+detalle|ver\s+producto|detalle|comprar|consultar|stock|precio|marca|modelo|procedencia|oem|tags?)$/i.test(value)) {
     return false;
   }
+  if (/^(?:marca|modelo|procedencia|oem|c[oó]d\.?\s*yokomitsu|sku|precio|stock|tags?)\b/i.test(value)) return false;
   if (/function\s*\(|\$\.ajax|recaptcha|grecaptcha|cookie|login|password|navbar|footer/i.test(value)) return false;
   if (value.length < 4 || value.length > 180) return false;
   return /[A-ZÁÉÍÓÚÑ0-9]/.test(value);
@@ -1210,3 +1290,6 @@ function compactAttributes(values: Record<string, string | undefined>): Record<s
 function isRecord(value: unknown): value is JsonRecord {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
+
+
+
