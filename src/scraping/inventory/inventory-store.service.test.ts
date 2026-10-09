@@ -53,6 +53,50 @@ test('getFilteredPage limita el resultado a 200 y aplica offset', async () => {
   assert.deepEqual(capturedParams, [200, 15]);
 });
 
+test('getFilteredPage congela membresia y orden con snapshotBefore', async () => {
+  let capturedSql = '';
+  let capturedParams: unknown[] = [];
+
+  const service = new InventoryStoreService({
+    async query(sql: string, params?: unknown[]) {
+      capturedSql = sql;
+      capturedParams = params ?? [];
+      return { rows: [] } as never;
+    },
+  } as never);
+
+  await service.getFilteredPage(
+    { site: 'Selvir', snapshotBefore: '2026-10-09T17:00:00.000Z' },
+    { limit: 200, offset: 400 },
+  );
+
+  assert.ok(capturedSql.includes('created_at <= $2::timestamptz'));
+  assert.ok(capturedSql.includes('ORDER BY created_at DESC, id ASC'));
+  assert.ok(capturedSql.includes('LIMIT $3'));
+  assert.ok(capturedSql.includes('OFFSET $4'));
+  assert.deepEqual(capturedParams, [
+    ['selvir.com.uy'],
+    '2026-10-09T17:00:00.000Z',
+    200,
+    400,
+  ]);
+});
+
+test('getFilteredPage usa id como desempate aun sin snapshot', async () => {
+  let capturedSql = '';
+
+  const service = new InventoryStoreService({
+    async query(sql: string) {
+      capturedSql = sql;
+      return { rows: [] } as never;
+    },
+  } as never);
+
+  await service.getFilteredPage({}, { limit: 20 });
+
+  assert.ok(capturedSql.includes('ORDER BY updated_at DESC, id ASC'));
+});
+
 test('getFilteredPage busca sobre el texto materializado', async () => {
   let capturedSql = '';
   const service = new InventoryStoreService({
