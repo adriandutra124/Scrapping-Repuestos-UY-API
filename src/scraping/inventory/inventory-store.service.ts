@@ -39,6 +39,8 @@ export interface InventoryQueryFilters {
   availability?: string;
   priceOrder?: string;
   vehicleBrand?: string;
+  /** Freeze membership/order for long export jobs. ISO timestamp. */
+  snapshotBefore?: string;
 }
 
 export interface InventoryQueryPagination {
@@ -648,7 +650,7 @@ function buildInventoryQuery(filters: InventoryQueryFilters, pagination: Invento
   const { whereClause, params } = buildInventoryConditions(filters);
   const limit = normalizeLimit(pagination.limit);
   const offset = normalizeOffset(pagination.offset);
-  const orderBy = buildOrderByClause(filters.priceOrder);
+  const orderBy = buildOrderByClause(filters.priceOrder, Boolean(normalizeSnapshotBefore(filters.snapshotBefore)));
   const orderedByPrice = isPriceOrder(filters.priceOrder);
 
   if (limit !== undefined) {
@@ -775,6 +777,12 @@ function buildInventoryConditions(filters: InventoryQueryFilters) {
     `);
   }
 
+  const snapshotBefore = normalizeSnapshotBefore(filters.snapshotBefore);
+  if (snapshotBefore) {
+    params.push(snapshotBefore);
+    conditions.push(`created_at <= ${params.length}::timestamptz`);
+  }
+
   const vehicleBrand = resolveVehicleBrandFilterId(filters.vehicleBrand);
   if (vehicleBrand) {
     params.push(vehicleBrand);
@@ -791,6 +799,13 @@ function buildInventoryConditions(filters: InventoryQueryFilters) {
   const whereClause = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
 
   return { whereClause, params };
+}
+
+function normalizeSnapshotBefore(value?: string): string | undefined {
+  const raw = value?.trim();
+  if (!raw) return undefined;
+  const parsed = Date.parse(raw);
+  return Number.isFinite(parsed) ? new Date(parsed).toISOString() : undefined;
 }
 
 function normalizeState(value?: string): string | undefined {
@@ -855,17 +870,21 @@ function normalizeSiteAlias(value: string): string {
     .replace(/[^a-z0-9]+/g, '');
 }
 
-function buildOrderByClause(priceOrder?: string): string {
+function buildOrderByClause(priceOrder?: string, stableSnapshot = false): string {
   const normalized = priceOrder?.trim().toLowerCase();
   if (normalized === 'asc') {
-    return `price_sort ASC NULLS LAST, updated_at DESC`;
+    return stableSnapshot
+      ? `price_sort ASC NULLS LAST, created_at DESC, id ASC`
+      : `price_sort ASC NULLS LAST, updated_at DESC, id ASC`;
   }
 
   if (normalized === 'desc') {
-    return `price_sort DESC NULLS LAST, updated_at DESC`;
+    return stableSnapshot
+      ? `price_sort DESC NULLS LAST, created_at DESC, id ASC`
+      : `price_sort DESC NULLS LAST, updated_at DESC, id ASC`;
   }
 
-  return `updated_at DESC`;
+  return stableSnapshot ? `created_at DESC, id ASC` : `updated_at DESC, id ASC`;
 }
 
 function isPriceOrder(priceOrder?: string): boolean {
