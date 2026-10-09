@@ -780,7 +780,7 @@ function buildInventoryConditions(filters: InventoryQueryFilters) {
   const snapshotBefore = normalizeSnapshotBefore(filters.snapshotBefore);
   if (snapshotBefore) {
     params.push(snapshotBefore);
-    conditions.push('created_at <= 
+    conditions.push(`created_at <= $${params.length}::timestamptz`);
   }
 
   const vehicleBrand = resolveVehicleBrandFilterId(filters.vehicleBrand);
