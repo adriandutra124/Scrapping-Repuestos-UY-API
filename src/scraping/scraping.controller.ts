@@ -180,6 +180,7 @@ export class ScrapingController {
     @Query('availability') availability?: string,
     @Query('priceOrder') priceOrder?: string,
     @Query('vehicleBrand') vehicleBrand?: string,
+    @Query('snapshotBefore') snapshotBefore?: string,
     @Query('limit') limit?: string,
     @Query('offset') offset?: string,
   ) {
@@ -190,6 +191,7 @@ export class ScrapingController {
       availability,
       priceOrder,
       vehicleBrand,
+      snapshotBefore,
     }, {
       limit: Number(limit),
       offset: Number(offset),
