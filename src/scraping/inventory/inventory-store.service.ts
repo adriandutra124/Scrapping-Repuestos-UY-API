@@ -953,26 +953,6 @@ function normalizeOffset(value?: number): number | undefined {
 
   return Math.max(0, Math.trunc(value as number));
 }
- + params.length + '::timestamptz');
-  }
-
-  const vehicleBrand = resolveVehicleBrandFilterId(filters.vehicleBrand);
-  if (vehicleBrand) {
-    params.push(vehicleBrand);
-    conditions.push(`
-      EXISTS (
-        SELECT 1
-        FROM scraping_inventory_vehicle_brands vehicle_brand_link
-        WHERE vehicle_brand_link.inventory_id = scraping_inventory.id
-          AND vehicle_brand_link.brand_id = $${params.length}
-      )
-    `);
-  }
-
-  const whereClause = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
-
-  return { whereClause, params };
-}
 
 function normalizeSnapshotBefore(value?: string): string | undefined {
   const raw = value?.trim();
