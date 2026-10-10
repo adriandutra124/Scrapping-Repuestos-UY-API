@@ -1,0 +1,26 @@
+name: Inventory snapshot checks
+
+on:
+  push:
+    branches:
+      - fix/inventory-stable-export-snapshot
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.2.2
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm run build
+      - run: node --test dist/scraping/inventory/inventory-store.service.test.js
