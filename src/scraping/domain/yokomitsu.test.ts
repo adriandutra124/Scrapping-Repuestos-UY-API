@@ -362,13 +362,13 @@ test('Yokomitsu extrae productos desde data HTML sin asumir stock por Comprar', 
   assert.equal(products[0].attributes?.vehicleModel, 'Corolla');
   assert.equal(products[0].attributes?.proximaLlegada, '20 dias');
   assert.equal(products[0].attributes?.procedencia, 'JP');
-  assert.equal(products[0].price, '3406');
+  assert.equal(products[0].price, '4155.32');
   assert.equal(products[0].currency, 'UYU');
   assert.equal(products[0].imageUrl, 'https://www.yokomitsuparts.com.uy/v2/img/yokomitsu/yok-001.jpg');
   assert.equal(products[0].availability, 'Stock Cr\u00edtico');
   assert.equal(products[0].attributes?.stockStatus, 'Stock Cr\u00edtico');
   assert.equal(products[0].stock, undefined);
-  assert.equal(products[1].price, '9221');
+  assert.equal(products[1].price, '11249.62');
   assert.equal(products[1].availability, 'out_of_stock');
   assert.equal(products[1].attributes?.stockStatus, 'out_of_stock');
   assert.equal(products[1].stock, undefined);
@@ -433,7 +433,7 @@ test('Yokomitsu detalle no contamina descripcion ni imagenes con assets globales
   assert.equal(product.productName, 'Cremallera direccion Toyota Corolla');
   assert.equal(product.sku, 'YK-DETAIL-1');
   assert.equal(product.brand, 'DemoBrand');
-  assert.equal(product.price, '9221');
+  assert.equal(product.price, '11249.62');
   assert.equal(product.currency, 'UYU');
   assert.equal(product.availability, 'Stock Cr\u00edtico');
   assert.equal(product.description, 'Cremallera hidraulica nueva para aplicacion sanitizada.');
@@ -469,7 +469,7 @@ test('Yokomitsu detalle descarta descripcion contaminada y assets de interfaz', 
   assert.equal(product.imageUrl, undefined);
   assert.equal(product.imageUrls, undefined);
   assert.equal(product.sku, 'YK-DETAIL-EMPTY');
-  assert.equal(product.price, '3406');
+  assert.equal(product.price, '4155.32');
 });
 
 test('Yokomitsu ficha con varias productsGalleries usa solo galeria real y conserva orden', () => {
@@ -1115,7 +1115,7 @@ test('Yokomitsu detalle lee precio actual fuera del contenedor del producto y no
     </div>
   </body></html>`;
   const product = extractYokomitsuProductDetailFromHtml(html, 'https://yokomitsuparts.com.uy/v2/producto-detalle/ck/40578/test');
-  assert.equal(product?.price, '1237');
+  assert.equal(product?.price, '1509.14');
   assert.notEqual(product?.price, '38');
 });
 
@@ -1136,4 +1136,29 @@ test('Yokomitsu precio regular +IVA y precio sin +IVA no duplican impuesto', () 
   const url = 'https://www.yokomitsuparts.com.uy/v2/producto-detalle/grand-vitara/52286/test';
   assert.equal(extractYokomitsuProductDetailFromHtml(base('<h3>$682</h3><span>+IVA</span>'), url)?.price, '832.04');
   assert.equal(extractYokomitsuProductDetailFromHtml(base('<h3>$832.04</h3>'), url)?.price, '832.04');
+});
+
+test('Yokomitsu listado +IVA convierte una sola vez y respeta precio final sin indicador', () => {
+  const html = `<section>
+    <article class="producto" data-codprod="YK-VAT-LIST">
+      <a href="/v2/producto-detalle/ck/40578/item">Amortiguador</a>
+      <strong class="precio">$1.237 +IVA</strong>
+    </article>
+    <article class="producto" data-codprod="YK-FINAL-LIST">
+      <a href="/v2/producto-detalle/grand-vitara/52286/item">Amortiguador</a>
+      <strong class="precio">$832,04</strong>
+    </article>
+  </section>`;
+  const products = extractYokomitsuProductsFromHtml(html, 'https://www.yokomitsuparts.com.uy/v2/', 10);
+  assert.equal(products.find((product) => product.sku === 'YK-VAT-LIST')?.price, '1509.14');
+  assert.equal(products.find((product) => product.sku === 'YK-FINAL-LIST')?.price, '832.04');
+});
+
+test('Yokomitsu sin precio valido no interpreta badge porcentaje como monto', () => {
+  const html = `<html><body><article class="producto-detalle" data-codprod="YK-SIN-PRECIO">
+    <h1>PRODUCTO SIN PRECIO</h1></article>
+    <div id="prices-product"><div class="precio-oferta"><div class="ticket2">-38%</div></div><span>+IVA</span></div>
+  </body></html>`;
+  const product = extractYokomitsuProductDetailFromHtml(html, 'https://www.yokomitsuparts.com.uy/v2/producto-detalle/demo/1/item');
+  assert.equal(product?.price, undefined);
 });
