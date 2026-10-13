@@ -610,7 +610,11 @@ function normalizeYokomitsuHtmlProduct(card: HTMLElement, baseUrl: string, optio
     ?? deriveYokomitsuProductNameFromSourceUrl(sourceUrl);
   const sku = cleanText(card.getAttribute('data-codprod'))
     ?? labeledValue(card, ['Cod. Yokomitsu', 'C\u00f3d. Yokomitsu', 'Codigo Yokomitsu', 'C\u00f3digo Yokomitsu', 'SKU', 'Codigo', 'C\u00f3digo']);
-  const offerPriceHeading = card.querySelector('#prices-product .precio-oferta h2');
+  // The detail container may be nested inside the page's price panel. Search the
+  // full document as well, and never treat a discount badge as a product price.
+  const priceRoot = options.documentRoot ?? card;
+  const offerPriceHeading = priceRoot.querySelector('#prices-product .precio-oferta h2')
+    ?? card.querySelector('#prices-product .precio-oferta h2');
   const offerPriceHtml = offerPriceHeading?.innerHTML
     ?.replace(/<span\b[^>]*>.*?<\/span>/gis, ' ')
     .replace(/<[^>]+>/g, ' ');
@@ -618,7 +622,8 @@ function normalizeYokomitsuHtmlProduct(card: HTMLElement, baseUrl: string, optio
     ?.match(/(?:US\$|\$U|\$|UYU|USD)\s*\d[\d.,]*/i)?.[0];
 
   const rawPrice = offerCurrentPrice
-    ?? firstElementText(card, ['#prices-product h3', '#prices-product > h2', '#prices-product h2', '.price', '.precio', '[class*="price"]', '[class*="precio"]'])
+    ?? firstElementText(priceRoot, ['#prices-product h3', '#prices-product > h2', '#prices-product h2'])
+    ?? firstElementText(card, ['.price', '.precio', '[class*="price"]', '[class*="precio"]'].filter((selector) => !/oferta|ticket/i.test(selector)))
     ?? text.match(/(?:US\$|\$U|\$|UYU|USD)\s*\d[\d.,]*(?:\s*\+?\s*IVA)?/i)?.[0];
   const imageUrls = extractYokomitsuProductImageUrls(card, baseUrl, Boolean(options.detail), options.documentRoot);
   const referencia = labeledValue(card, ['OEM', 'Referencia', 'Ref']);
