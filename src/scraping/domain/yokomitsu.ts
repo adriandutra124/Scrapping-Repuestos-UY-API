@@ -616,10 +616,10 @@ function normalizeYokomitsuHtmlProduct(card: HTMLElement, baseUrl: string, optio
   const pricePanel = priceRoot.querySelector('#prices-product');
   const offerPriceHeading = pricePanel?.querySelector('.precio-oferta h2');
   const offerPriceHtml = offerPriceHeading?.innerHTML
-    ?.replace(/<span\\b[^>]*>.*?<\\/span>/gis, ' ')
+    ?.replace(/<span\b[^>]*>.*?<\/span>/gis, ' ')
     .replace(/<[^>]+>/g, ' ');
   const offerCurrentPrice = cleanText(offerPriceHtml)
-    ?.match(/(?:US\\$|\\$U|\\$|UYU|USD)\\s*\\d[\\d.,]*/i)?.[0];
+    ?.match(/(?:US\$|\$U|\$|UYU|USD)\s*\d[\d.,]*/i)?.[0];
   // A discount badge (e.g. -38%) must never become the sale price.
   // When a dedicated price panel exists, refuse generic fallbacks into its badges.
   const panelPrice = offerCurrentPrice
