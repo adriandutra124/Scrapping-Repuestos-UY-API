@@ -1100,3 +1100,21 @@ async function clientWithSessionCleanup(
     password: 'SANITIZED_PASSWORD',
   }, callback);
 }
+
+
+test('Yokomitsu detalle lee precio actual fuera del contenedor del producto y no el descuento', () => {
+  const html = `<html><body>
+    <article class="producto-detalle" data-codprod="7183011201">
+      <h1>AMORTIGUADOR DELANTERO DERECHO GAS CK</h1>
+      <span>Cód. Yokomitsu: 7183011201</span>
+    </article>
+    <div id="prices-product">
+      <div class="precio-oferta"><div class="ticket2">-38%</div>
+        <h2>$1.237 <span>$1.989</span></h2>
+      </div><div>+IVA</div>
+    </div>
+  </body></html>`;
+  const product = extractYokomitsuProductDetailFromHtml(html, 'https://yokomitsuparts.com.uy/v2/producto-detalle/ck/40578/test');
+  assert.equal(product?.price, '1237');
+  assert.notEqual(product?.price, '38');
+});
