@@ -24,3 +24,4 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm run build
       - run: node --test dist/scraping/inventory/inventory-store.service.test.js
+      - run: node --test dist/scraping/domain/yokomitsu.test.js dist/scraping/domain/yokomitsu-full.test.js

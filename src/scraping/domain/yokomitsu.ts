@@ -228,6 +228,20 @@ export function normalizeYokomitsuPrice(value?: string): string | undefined {
   return numeric.replace(',', '.');
 }
 
+/** Yokomitsu publica algunos importes como precio base +IVA.
+ * Normalizar solamente cuando la fuente indique expresamente ese recargo.
+ * product.price queda expresado como costo final, listo para inventario.
+ */
+function normalizeYokomitsuCostPrice(rawPrice?: string, plusVat = false): string | undefined {
+  const normalized = normalizeYokomitsuPrice(rawPrice);
+  if (!normalized) return undefined;
+  if (!plusVat && !/\+\s*IVA\b/i.test(rawPrice ?? '')) return normalized;
+  const amount = Number(normalized);
+  return Number.isFinite(amount)
+    ? (Math.round(amount * 122 + Number.EPSILON) / 100).toFixed(2)
+    : undefined;
+}
+
 export function hasVisibleYokomitsuCaptchaChallenge(signals: YokomitsuCaptchaSignal[]): boolean {
   return signals.some((signal) => {
     const evidence = [signal.id, signal.className, signal.title, signal.src, signal.text].filter(Boolean).join(' ');
@@ -512,7 +526,7 @@ function normalizeYokomitsuProduct(record: JsonRecord, baseUrl: string): Product
     sourceUrl,
     sku,
     brand: firstText(record, ['brand', 'marcaProducto', 'marca_producto', 'fabricante']),
-    price: normalizeYokomitsuPrice(rawPrice),
+    price: normalizeYokomitsuCostPrice(rawPrice),
     currency: inferYokomitsuCurrency(rawPrice, firstText(record, ['currency', 'moneda'])),
     stock,
     availability: inferAvailability(record, stock),
@@ -626,10 +640,11 @@ function normalizeYokomitsuHtmlProduct(card: HTMLElement, baseUrl: string, optio
     ?? firstElementText(pricePanel ?? priceRoot, pricePanel
       ? ['h3', ':scope > h2']
       : ['#prices-product h3', '#prices-product > h2']);
+  const priceHasVatSurcharge = Boolean(pricePanel && /\+\s*IVA\b/i.test(pricePanel.text));
   const rawPrice = pricePanel
     ? panelPrice
     : firstElementText(card, ['.price', '.precio'])
-      ?? text.match(/(?:US\\$|\\$U|\\$|UYU|USD)\\s*\\d[\\d.,]*(?:\\s*\\+?\\s*IVA)?/i)?.[0];
+      ?? text.match(/(?:US\$|\$U|\$|UYU|USD)\s*\d[\d.,]*(?:\s*\+?\s*IVA)?/i)?.[0];
   const imageUrls = extractYokomitsuProductImageUrls(card, baseUrl, Boolean(options.detail), options.documentRoot);
   const referencia = labeledValue(card, ['OEM', 'Referencia', 'Ref']);
   const visibleBrand = sanitizeYokomitsuVehicleBrand(labeledValue(card, ['Marca']));
@@ -650,7 +665,7 @@ function normalizeYokomitsuHtmlProduct(card: HTMLElement, baseUrl: string, optio
     sourceUrl: sourceUrl ?? baseUrl,
     sku,
     brand: visibleBrand,
-    price: normalizeYokomitsuPrice(rawPrice),
+    price: normalizeYokomitsuCostPrice(rawPrice, priceHasVatSurcharge),
     currency: inferYokomitsuCurrency(rawPrice),
     availability,
     description: options.detail ? extractYokomitsuDetailDescription(card) : undefined,
