@@ -1118,3 +1118,22 @@ test('Yokomitsu detalle lee precio actual fuera del contenedor del producto y no
   assert.equal(product?.price, '1237');
   assert.notEqual(product?.price, '38');
 });
+
+test('Yokomitsu oferta con descuento y +IVA guarda costo final', () => {
+  const html = `<html><body>
+    <article class="producto-detalle" data-codprod="7183011201"><h1>AMORTIGUADOR GEELY CK</h1></article>
+    <div id="prices-product"><div class="precio-oferta"><div class="ticket2">-38%</div><h2>$1.237 <span>$1.989</span></h2></div><span>+IVA</span></div>
+  </body></html>`;
+  const product = extractYokomitsuProductDetailFromHtml(html, 'https://www.yokomitsuparts.com.uy/v2/producto-detalle/ck/40578/test');
+  assert.equal(product?.price, '1509.14');
+});
+
+test('Yokomitsu precio regular +IVA y precio sin +IVA no duplican impuesto', () => {
+  const base = (pricePanel: string) => `<html><body>
+    <article class="producto-detalle" data-codprod="7174571313"><h1>AMORTIGUADOR GRAND VITARA</h1></article>
+    <div id="prices-product">${pricePanel}</div>
+  </body></html>`;
+  const url = 'https://www.yokomitsuparts.com.uy/v2/producto-detalle/grand-vitara/52286/test';
+  assert.equal(extractYokomitsuProductDetailFromHtml(base('<h3>$682</h3><span>+IVA</span>'), url)?.price, '832.04');
+  assert.equal(extractYokomitsuProductDetailFromHtml(base('<h3>$832.04</h3>'), url)?.price, '832.04');
+});
