@@ -626,6 +626,7 @@ function normalizeYokomitsuHtmlProduct(card: HTMLElement, baseUrl: string, optio
     ?? firstElementText(pricePanel ?? priceRoot, pricePanel
       ? ['h3', ':scope > h2']
       : ['#prices-product h3', '#prices-product > h2']);
+  const priceHasVatSurcharge = Boolean(pricePanel && /\+\s*IVA\b/i.test(pricePanel.text));
   const rawPrice = pricePanel
     ? panelPrice
     : firstElementText(card, ['.price', '.precio'])
@@ -650,7 +651,14 @@ function normalizeYokomitsuHtmlProduct(card: HTMLElement, baseUrl: string, optio
     sourceUrl: sourceUrl ?? baseUrl,
     sku,
     brand: visibleBrand,
-    price: normalizeYokomitsuPrice(rawPrice),
+    price: priceHasVatSurcharge && rawPrice
+      ? (() => {
+        const normalized = normalizeYokomitsuPrice(rawPrice);
+        if (!normalized) return undefined;
+        const amount = Number(normalized);
+        return Number.isFinite(amount) ? (Math.round((amount * 122) + Number.EPSILON) / 100).toFixed(2) : undefined;
+      })()
+      : normalizeYokomitsuPrice(rawPrice),
     currency: inferYokomitsuCurrency(rawPrice),
     availability,
     description: options.detail ? extractYokomitsuDetailDescription(card) : undefined,
