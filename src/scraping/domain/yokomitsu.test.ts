@@ -7,6 +7,7 @@ import {
   extractCookieNames,
   extractFieldNamesFromBody,
   extractYokomitsuProductDetailFromHtml,
+  extractYokomitsuProductsFromHtml,
   extractYokomitsuProductsFromJson,
   hasReachedYokomitsuPortal,
   hasVisibleYokomitsuCaptchaChallenge,
