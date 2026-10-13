@@ -644,7 +644,7 @@ function normalizeYokomitsuHtmlProduct(card: HTMLElement, baseUrl: string, optio
   const rawPrice = pricePanel
     ? panelPrice
     : firstElementText(card, ['.price', '.precio'])
-      ?? text.match(/(?:US\\$|\\$U|\\$|UYU|USD)\\s*\\d[\\d.,]*(?:\\s*\\+?\\s*IVA)?/i)?.[0];
+      ?? text.match(/(?:US\$|\$U|\$|UYU|USD)\s*\d[\d.,]*(?:\s*\+?\s*IVA)?/i)?.[0];
   const imageUrls = extractYokomitsuProductImageUrls(card, baseUrl, Boolean(options.detail), options.documentRoot);
   const referencia = labeledValue(card, ['OEM', 'Referencia', 'Ref']);
   const visibleBrand = sanitizeYokomitsuVehicleBrand(labeledValue(card, ['Marca']));
