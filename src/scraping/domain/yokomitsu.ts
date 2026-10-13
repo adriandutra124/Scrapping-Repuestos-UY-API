@@ -613,18 +613,23 @@ function normalizeYokomitsuHtmlProduct(card: HTMLElement, baseUrl: string, optio
   // The detail container may be nested inside the page's price panel. Search the
   // full document as well, and never treat a discount badge as a product price.
   const priceRoot = options.documentRoot ?? card;
-  const offerPriceHeading = priceRoot.querySelector('#prices-product .precio-oferta h2')
-    ?? card.querySelector('#prices-product .precio-oferta h2');
+  const pricePanel = priceRoot.querySelector('#prices-product');
+  const offerPriceHeading = pricePanel?.querySelector('.precio-oferta h2');
   const offerPriceHtml = offerPriceHeading?.innerHTML
-    ?.replace(/<span\b[^>]*>.*?<\/span>/gis, ' ')
+    ?.replace(/<span\\b[^>]*>.*?<\\/span>/gis, ' ')
     .replace(/<[^>]+>/g, ' ');
   const offerCurrentPrice = cleanText(offerPriceHtml)
-    ?.match(/(?:US\$|\$U|\$|UYU|USD)\s*\d[\d.,]*/i)?.[0];
-
-  const rawPrice = offerCurrentPrice
-    ?? firstElementText(priceRoot, ['#prices-product h3', '#prices-product > h2', '#prices-product h2'])
-    ?? firstElementText(card, ['.price', '.precio', '[class*="price"]', '[class*="precio"]'].filter((selector) => !/oferta|ticket/i.test(selector)))
-    ?? text.match(/(?:US\$|\$U|\$|UYU|USD)\s*\d[\d.,]*(?:\s*\+?\s*IVA)?/i)?.[0];
+    ?.match(/(?:US\\$|\\$U|\\$|UYU|USD)\\s*\\d[\\d.,]*/i)?.[0];
+  // A discount badge (e.g. -38%) must never become the sale price.
+  // When a dedicated price panel exists, refuse generic fallbacks into its badges.
+  const panelPrice = offerCurrentPrice
+    ?? firstElementText(pricePanel ?? priceRoot, pricePanel
+      ? ['h3', ':scope > h2']
+      : ['#prices-product h3', '#prices-product > h2']);
+  const rawPrice = pricePanel
+    ? panelPrice
+    : firstElementText(card, ['.price', '.precio'])
+      ?? text.match(/(?:US\\$|\\$U|\\$|UYU|USD)\\s*\\d[\\d.,]*(?:\\s*\\+?\\s*IVA)?/i)?.[0];
   const imageUrls = extractYokomitsuProductImageUrls(card, baseUrl, Boolean(options.detail), options.documentRoot);
   const referencia = labeledValue(card, ['OEM', 'Referencia', 'Ref']);
   const visibleBrand = sanitizeYokomitsuVehicleBrand(labeledValue(card, ['Marca']));
