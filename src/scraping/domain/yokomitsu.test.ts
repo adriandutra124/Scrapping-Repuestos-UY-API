@@ -1163,3 +1163,14 @@ test('Yokomitsu sin precio valido no interpreta badge porcentaje como monto', ()
   const product = extractYokomitsuProductDetailFromHtml(html, 'https://www.yokomitsuparts.com.uy/v2/producto-detalle/demo/1/item');
   assert.equal(product?.price, undefined);
 });
+
+test('Yokomitsu recupera precio +IVA del texto de la card sin clase precio', () => {
+  const html = `<html><body>
+    <article class="producto-detalle" data-codprod="YK-GENERICO">
+      <h1>AMORTIGUADOR</h1>
+      <p>Precio: $1.237 +IVA</p>
+    </article>
+  </body></html>`;
+  const product = extractYokomitsuProductDetailFromHtml(html, 'https://www.yokomitsuparts.com.uy/v2/producto-detalle/demo/2/item');
+  assert.equal(product?.price, '1509.14');
+});
