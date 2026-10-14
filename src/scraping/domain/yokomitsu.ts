@@ -228,6 +228,17 @@ export function normalizeYokomitsuPrice(value?: string): string | undefined {
   return numeric.replace(',', '.');
 }
 
+/** Cost in UYU, including VAT only when the supplier explicitly marks +IVA. */
+export function normalizeYokomitsuCostWithVat(value?: string): string | undefined {
+  const amount = normalizeYokomitsuPrice(value);
+  if (!amount) return undefined;
+  const number = Number(amount);
+  if (!Number.isFinite(number) || number <= 0) return undefined;
+  const vatExclusive = /\\+\\s*IVA\\b/i.test(value ?? '');
+  const cents = Math.round((number * (vatExclusive ? 1.22 : 1) + Number.EPSILON) * 100);
+  return (cents / 100).toFixed(2).replace(/\\.00$/, '');
+}
+
 export function hasVisibleYokomitsuCaptchaChallenge(signals: YokomitsuCaptchaSignal[]): boolean {
   return signals.some((signal) => {
     const evidence = [signal.id, signal.className, signal.title, signal.src, signal.text].filter(Boolean).join(' ');
@@ -615,21 +626,28 @@ function normalizeYokomitsuHtmlProduct(card: HTMLElement, baseUrl: string, optio
   const priceRoot = options.documentRoot ?? card;
   const pricePanel = priceRoot.querySelector('#prices-product');
   const offerPriceHeading = pricePanel?.querySelector('.precio-oferta h2');
+  // Read the actual offer heading, not its discount badge or crossed-out price.
   const offerPriceHtml = offerPriceHeading?.innerHTML
-    ?.replace(/<span\b[^>]*>.*?<\/span>/gis, ' ')
+    ?.replace(/<span\\b[^>]*>.*?<\\/span>/gis, ' ')
+    .replace(/<del\\b[^>]*>.*?<\\/del>/gis, ' ')
+    .replace(/<s\\b[^>]*>.*?<\\/s>/gis, ' ')
     .replace(/<[^>]+>/g, ' ');
   const offerCurrentPrice = cleanText(offerPriceHtml)
-    ?.match(/(?:US\$|\$U|\$|UYU|USD)\s*\d[\d.,]*/i)?.[0];
-  // A discount badge (e.g. -38%) must never become the sale price.
-  // When a dedicated price panel exists, refuse generic fallbacks into its badges.
+    ?.match(/(?:US\\$|\\$U|\\$|UYU|USD)\\s*\\d[\\d.,]*/i)?.[0];
   const panelPrice = offerCurrentPrice
     ?? firstElementText(pricePanel ?? priceRoot, pricePanel
       ? ['h3', ':scope > h2']
       : ['#prices-product h3', '#prices-product > h2']);
+  // Never fall back to arbitrary page text for detail pages: a -38% badge
+  // otherwise becomes an apparent $38 product price.
   const rawPrice = pricePanel
     ? panelPrice
-    : firstElementText(card, ['.price', '.precio'])
-      ?? text.match(/(?:US\\$|\\$U|\\$|UYU|USD)\\s*\\d[\\d.,]*(?:\\s*\\+?\\s*IVA)?/i)?.[0];
+    : options.detail
+      ? undefined
+      : firstElementText(card, ['.price', '.precio'])
+        ?? text.match(/(?:US\\$|\\$U|\\$|UYU|USD)\\s*\\d[\\d.,]*(?:\\s*\\+?\\s*IVA)?/i)?.[0];
+  const vatMarker = pricePanel && /\\+\\s*IVA\\b/i.test(elementText(pricePanel) ?? '');
+  const costPrice = rawPrice ? normalizeYokomitsuCostWithVat(vatMarker ? `${rawPrice} +IVA` : rawPrice) : undefined;
   const imageUrls = extractYokomitsuProductImageUrls(card, baseUrl, Boolean(options.detail), options.documentRoot);
   const referencia = labeledValue(card, ['OEM', 'Referencia', 'Ref']);
   const visibleBrand = sanitizeYokomitsuVehicleBrand(labeledValue(card, ['Marca']));
@@ -650,7 +668,7 @@ function normalizeYokomitsuHtmlProduct(card: HTMLElement, baseUrl: string, optio
     sourceUrl: sourceUrl ?? baseUrl,
     sku,
     brand: visibleBrand,
-    price: normalizeYokomitsuPrice(rawPrice),
+    price: costPrice,
     currency: inferYokomitsuCurrency(rawPrice),
     availability,
     description: options.detail ? extractYokomitsuDetailDescription(card) : undefined,
