@@ -17,6 +17,7 @@ import {
   isLikelyYokomitsuCatalogUrl,
   isYokomitsuSearchEndpoint,
   normalizeYokomitsuPrice,
+  normalizeYokomitsuCostWithVat,
   parseYokomitsuSearchRequestBody,
   parseYokomitsuSearchResponse,
   parseYokomitsuSearchResponseFull,
@@ -52,6 +53,16 @@ test('Yokomitsu normaliza precios uruguayos sin afectar otros proveedores', () =
   assert.equal(normalizeYokomitsuPrice('123,45'), '123.45');
   assert.equal(normalizeYokomitsuPrice('$3.406 +IVA'), '3406');
   assert.equal(normalizeYokomitsuPrice('$9.221 +IVA'), '9221');
+});
+
+test('Yokomitsu calcula costos finales con IVA explicito y evita doble IVA', () => {
+  assert.equal(normalizeYokomitsuCostWithVat('$1.261 +IVA'), '1538.42');
+  assert.equal(normalizeYokomitsuCostWithVat('$3.137 +IVA'), '3827.14');
+  assert.equal(normalizeYokomitsuCostWithVat('$703 +IVA'), '857.66');
+  assert.equal(normalizeYokomitsuCostWithVat('$1.237 +IVA'), '1509.14');
+  assert.equal(normalizeYokomitsuCostWithVat('$682 +IVA'), '832.04');
+  assert.equal(normalizeYokomitsuCostWithVat('$1.261 IVA incluido'), '1261');
+  assert.equal(normalizeYokomitsuCostWithVat('$0 +IVA'), undefined);
 });
 
 test('Yokomitsu redacta credenciales, cookies y tokens en requests', () => {
